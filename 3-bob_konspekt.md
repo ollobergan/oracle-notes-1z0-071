@@ -62,6 +62,16 @@ INSERT ALL
 SELECT ship_id, capacity FROM ships;
 ```
 
+- **Unconditional `INSERT ALL`** (`WHEN`siz): har bir `INTO` subquery natijasining **har bir qatorini oladi** — bitta qatorni bir nechta jadvalga nusxalash uchun ishlatiladi.
+  ```sql
+  INSERT ALL
+    INTO ships_archive (id) VALUES (ship_id)
+    INTO ships_log (id)     VALUES (ship_id)
+  SELECT ship_id FROM ships WHERE retired = 'Y';
+  ```
+
+> 🎓 **Exam Watch (Multi-table):** Multi-table `INSERT` ichida (subquery'da ham, `VALUES`da ham) **sequence `NEXTVAL`/`CURRVAL` ishlatib bo'lmaydi** → xato. Shuningdek u faqat **jadval**ga ishlaydi (view'ga emas) va **bitta subquery** talab qiladi.
+
 ---
 
 ## 3. UPDATE — qatorlarni yangilash
@@ -118,6 +128,18 @@ UPDATE projects SET cost = cost * 1.20 WHERE cost * 1.20 < 1000000;
 - **Tranzaksiya:** mantiqan bir butun DML buyruqlari ketma-ketligi.
 - **Read consistency:** boshqa sessiyalar **commit qilinmagan** o'zgarishlarni **ko'rmaydi**; faqat oxirgi commit holatini ko'radi (undo segmentlar orqali).
 - Bir sessiya o'zgartirayotgan qatorlar **qulflanadi** (lock) — boshqa sessiya o'sha qatorni commit/rollback'gacha yangilay olmaydi.
+
+### Explicit (qo'lda) qulflash — `SELECT ... FOR UPDATE`
+- `SELECT ... FOR UPDATE` — tanlangan qatorlarni **oldindan qulflaydi** (hali UPDATE/DELETE qilinmasa ham), boshqa sessiya ularni o'zgartira olmaydi.
+- **`OF ustun`** — bir nechta jadval join qilinganda, qaysi jadval qatorlarini qulflashni belgilaydi.
+- **`NOWAIT`** — qator band bo'lsa darhol `ORA-00054` xato (kutmaydi).
+- **`WAIT n`** — n soniya kutadi, keyin xato.
+- Qulf **`COMMIT` yoki `ROLLBACK`** bilan bo'shaydi.
+  ```sql
+  SELECT ship_id, capacity FROM ships
+  WHERE home_port_id = 701
+  FOR UPDATE OF capacity NOWAIT;
+  ```
 
 ### COMMIT turlari
 - **Explicit:** `COMMIT;` yoki `COMMIT WORK;`.

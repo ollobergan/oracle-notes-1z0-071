@@ -74,6 +74,11 @@
 | **`INTERVAL DAY(n1) TO SECOND(n2)`** | Kun…sekund oralig'i | `n1` def 2, `n2` def 6 |
 | **`BLOB` / `CLOB`** | Katta binar / matn | Terabayt darajasida |
 
+**`CHAR` vs `VARCHAR2` (asosiy farq):**
+- **`CHAR(n)`** — *fixed-length*. Kelgan qiymat `n` dan qisqa bo'lsa, Oracle uni **o'ng tomondan bo'sh joy (space) bilan `n` gacha to'ldiradi** va shu holda saqlaydi. Ya'ni har doim aniq `n` bayt egallaydi.
+- **`VARCHAR2(n)`** — *variable-length*. Faqat **kelgan qiymat uzunligicha** saqlaydi, bo'sh joy bilan to'ldirmaydi. `n` — bu ruxsat etilgan maksimum.
+- Oqibati: `CHAR` ustunidagi `'ABC'` aslida `'ABC   '` bo'lib saqlanadi; tenglashtirishda (`=`) bu farq muammo keltirib chiqarishi mumkin (blank-padded comparison semantikasi).
+
 **LOB (`BLOB`/`CLOB`/`NCLOB`) da TAQIQLANADI:** `PRIMARY KEY`, `UNIQUE`, `DISTINCT`, `GROUP BY`, `ORDER BY`, `JOIN` sharti.
 
 ---

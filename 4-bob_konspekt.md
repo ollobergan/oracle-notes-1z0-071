@@ -121,6 +121,12 @@ WHERE product_code LIKE 'AB\_%' ESCAPE '\';   -- 'AB_' bilan boshlanadiganlar
 
 > **Muhim farq:** ustun taxallusi (alias) `ORDER BY` da ishlaydi, lekin `WHERE` (va `GROUP BY`) da **ishlamaydi** — chunki WHERE SELECT dan oldin bajariladi va aliasni hali bilmaydi.
 
+> **`DISTINCT` + `ORDER BY` cheklovi (imtihon tuzog'i):** "SELECT ro'yxatida bo'lmagan ustun bo'yicha ham saralash mumkin" qoidasi **faqat oddiy SELECT** uchun. `SELECT DISTINCT` (va `UNION`) ishlatilsa, `ORDER BY` faqat **SELECT ro'yxatidagi** ustun/ifodaga ishora qila oladi, aks holda **`ORA-01791: not a SELECTed expression`**.
+> ```sql
+> SELECT DISTINCT ship_name FROM ships ORDER BY order_date;  -- XATO: ORA-01791
+> SELECT DISTINCT ship_name FROM ships ORDER BY ship_name;   -- TO'G'RI
+> ```
+
 ### 3.2. ORDER BY va NULL
 Oracle saralashda NULL ni **eng katta qiymat** deb oladi:
 *   **ASC** → NULL lar **oxirida** (standart `NULLS LAST`).
@@ -211,6 +217,7 @@ Matn/sana o'rnida ishlatilsa, tirnoq kerak: `WHERE name = '&username'`.
 *   `NOT IN (..., NULL)` → **0 qator** (AND zanjiri buziladi); `IN (..., NULL)` esa normal ishlaydi.
 *   `AND` `OR` dan oldin bajariladi — qavsga e'tibor.
 *   Alias `ORDER BY` da ishlaydi, `WHERE` da **ishlamaydi**.
+*   `SELECT DISTINCT` bilan `ORDER BY` faqat SELECT ro'yxatidagi ustunga ishora qiladi (aks holda `ORA-01791`).
 *   ORDER BY: ASC→NULL oxirida, DESC→NULL boshida.
 *   LIKE registrga sezgir.
 *   Row limiting: **manfiy → 0**, **kasr → truncate**, **NULL → bo'sh natija** (NULL ≠ 0!).

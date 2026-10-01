@@ -24,6 +24,8 @@ Konversiya qiymatning **ma'lumot turini** (data type) o'zgartiradi, qiymatning o
 *   `VARCHAR2`/`CHAR` ↔ `DATE` (agar satr NLS format maskasiga mos bo'lsa).
 *   `NUMBER` → `VARCHAR2`.
 
+> **⚠️ `||` har doim stringga o'tkazadi:** Konkatenatsiya operatori operandlarini avtomatik `VARCHAR2` ga implicit konversiya qiladi. `5 || 5` → `'55'` (matn, 10 emas); `SYSDATE || ''` → sana matn ko'rinishida. Natija har doim matn turi.
+
 ---
 
 ## 2-Qism: Explicit Konversiya Funksiyalari
@@ -51,11 +53,16 @@ TO_NUMBER(expression [, format_model [, nls_parms]])
 | `C` | ISO xalqaro valyuta kodi | `C999` → `USD150` |
 | `,` | Guruh (mingliklar) ajratgichi | `9,999` |
 | `.` | O'nlik kasr ajratgichi (faqat bitta) | `99.99` |
+| `G` | Guruh ajratgichi (NLS'ga bog'liq, `,` o'rniga) | `9G999` |
+| `D` | O'nlik ajratgich (NLS'ga bog'liq, `.` o'rniga) | `9D99` |
+| `S` | Ishorani (`+`/`-`) old yoki orqaga chiqaradi | `S999` → `+150` |
 | `MI` | Manfiy belgini **o'ngga** chiqaradi | `999MI` → `150-` |
 | `PR` | Manfiy sonni `<>` qavsga oladi | `999PR` → `<150>` |
 | `RN` / `rn` | Rim raqami (katta/kichik harf) | `RN` → `CL` |
 | `EEEE` | Ilmiy (eksponensial) ko'rinish | `9.9EEEE` |
 *   `TO_CHAR(1234.5, '$9,999.99')` → `$1,234.50`
+
+> **⚠️ MUSBAT SONGA OLD BO'SHLIQ:** Ishora o'rni uchun musbat son oldiga **bitta bo'sh joy** qo'yiladi. `TO_CHAR(150, '999')` → `' 150'` (4 belgi, 3 emas). `FM` yoki `S`/`MI` elementi bu bo'shliqni olib tashlaydi: `TO_CHAR(150, 'FM999')` → `'150'`. `LENGTH` yoki tenglik savollarida tuzoq.
 
 **B) Sanani matnga:** `TO_CHAR(date [, format_model [, nls_parms]])`
 
@@ -66,6 +73,7 @@ TO_NUMBER(expression [, format_model [, nls_parms]])
 | `RRRR` / `RR` | Asr almashuvini hisobga oluvchi yil (pastda) | `2026` / `26` |
 | `YY` | 2 xonali oddiy yil | `26` |
 | `MM` | Oy raqami (01–12) | `09` |
+| `RM` / `rm` | Oy Rim raqamida (katta/kichik harf) | `IX` |
 | `MONTH` / `MON` | Oyning to'liq nomi / 3 harfli qisqartmasi | `SEPTEMBER` / `SEP` |
 | `DAY` / `DY` | Hafta kunining to'liq nomi / 3 harfli qisqartmasi | `FRIDAY` / `FRI` |
 | `DD` | Oydagi kun (1–31) | `04` |
@@ -102,15 +110,18 @@ CAST(expression AS data_type)
 
 ## 3-Qism: RR va YY — Asr Logikasi (imtihon tuzog'i)
 
-2 xonali yil berilganda `YY` joriy asrni oladi, `RR` esa asrni **aqlli** aniqlaydi:
+2 xonali yil berilganda:
+*   **`YY`** — har doim **joriy asrni** oladi (o'ylab o'tirmaydi).
+*   **`RR`** — asrni **aqlli** tanlaydi: natija ikkita omilga bog'liq — (1) berilgan 2 xonali yil **00–49** yoki **50–99** guruhidami, (2) joriy yilning oxirgi 2 raqami qaysi guruhda.
 
-| Joriy yilning oxirgi 2 raqami | Berilgan 2 xonali yil 00–49 | Berilgan 2 xonali yil 50–99 |
-| :--- | :--- | :--- |
-| **00–49** | **joriy** asr | **oldingi** asr |
-| **50–99** | **keyingi** asr | **joriy** asr |
+**`RR` qoidasi (yodlash oson shakli):**
+*   Berilgan yil **00–49** → joriy yil ham **00–49** bo'lsa → **joriy** asr; joriy yil **50–99** bo'lsa → **keyingi** asr.
+*   Berilgan yil **50–99** → joriy yil **00–49** bo'lsa → **oldingi** asr; joriy yil **50–99** bo'lsa → **joriy** asr.
 
-*   Misol (joriy yil 2026 → oxirgi 2 raqam 26, ya'ni 00–49 guruhi): `RR` bilan `'95'` → `1995`, `'15'` → `2015`.
-*   `YY` bilan har doim joriy asr: `'95'` → `2095`.
+**Misollar** (joriy yil = 2026, ya'ni oxirgi 2 raqam **26** → "00–49" ustuni):
+*   `RR` bilan `'95'` (50–99 guruhi) → **1995** (oldingi asr).
+*   `RR` bilan `'15'` (00–49 guruhi) → **2015** (joriy asr).
+*   `YY` bilan `'95'` → **2095** (har doim joriy asr, 1995 emas).
 
 ---
 
@@ -132,7 +143,7 @@ CAST(expression AS data_type)
 NVL(expr1, expr2)
 ```
 *   `expr1` `NULL` emas → `expr1`; `expr1` `NULL` → `expr2`.
-*   **Aynan 2** parametr. `expr1` va `expr2` turlari mos (yoki implicit o'tadigan) bo'lishi shart.
+*   **Aynan 2** parametr. Qaytuvchi tur `expr1` bo'yicha aniqlanadi; `expr2` shunga moslanadi — mos kelmasa `ORA-01722`/`ORA-00932`. Masalan `NVL(hire_date, 'yo''q')` xato (sanaga matn moslashmaydi).
 *   `SELECT salary + NVL(bonus, 0) FROM employees;`
 
 ### 5.2. NVL2 — uch argumentli variant
@@ -148,7 +159,7 @@ NVL2(expr1, expr2, expr3)
 COALESCE(expr1, expr2, ..., exprN)
 ```
 *   Ro'yxatdagi **birinchi `NULL` bo'lmagan** qiymatni qaytaradi; barchasi `NULL` bo'lsa → `NULL`.
-*   **Kamida 2** argument; barcha argumentlar bir xil (yoki mos) turda bo'lishi kerak.
+*   **Kamida 2** argument; barcha argumentlar **birinchi argumentga** moslanadigan turda bo'lishi kerak (aks holda xatolik).
 *   `COALESCE(comm, bonus, salary, 0)`
 *   **NVL bilan farqi:** NVL faqat 2 argument; COALESCE ko'p argument qabul qiladi va argumentlarni **faqat kerak bo'lgunicha** baholaydi (short-circuit).
 
@@ -181,7 +192,7 @@ CASE status WHEN 1 THEN 'Active'
 END
 ```
 *   **Har doim `END` bilan tugaydi** (yozilmasa — syntax error).
-*   `THEN`/`ELSE` qaytargan barcha qiymatlar **bir xil turda** bo'lishi shart.
+*   `THEN`/`ELSE` qaytargan barcha qiymatlar **bir xil turda** bo'lishi shart — DECODE'dan farqli, CASE turlarni **moslashtirmaydi**; mos kelmasa `ORA-00932: inconsistent datatypes`. (Shuningdek Simple CASE'da solishtiriladigan ifodalar ham mos turda bo'lishi kerak.)
 *   `ELSE` yo'q va hech bir shart mos kelmasa → **`NULL`**.
 *   Simple CASE faqat **tenglik (`=`)** bilan ishlaydi; `>`, `<`, `IN`, `BETWEEN` kerak bo'lsa Searched CASE.
 
@@ -196,6 +207,7 @@ DECODE(expression, search1, result1 [, search2, result2, ...] [, default])
 **DECODE ning farqlari (imtihon uchun muhim):**
 *   Oxirida **`END` yo'q** — oddiy funksiya kabi `)` bilan tugaydi.
 *   Faqat **tenglik (`=`)** tekshiriladi (`>`, `<`, `AND` mumkin emas).
+*   **Qaytuvchi tur — birinchi `result` bo'yicha:** DECODE qaytaradigan ma'lumot turini **birinchi natija** argumenti aniqlaydi va qolgan natijalarni unga **implicit moslashtiradi**. Masalan birinchi natija `VARCHAR2` bo'lsa, keyingi raqamli natijalar ham matnga aylanadi. (CASE'da bunday moslashtirish YO'Q — pastga qarang.)
 *   **NULL ni maxsus ishlaydi:** DECODE `NULL` ni `NULL` ga **teng** deb hisoblaydi (oddiy `=` da `NULL = NULL` → noma'lum). Shuning uchun `DECODE(col, NULL, 'bosh', 'tola')` ishlaydi.
 *   ANSI emas — faqat Oracle'da.
 
@@ -210,6 +222,7 @@ DECODE(expression, search1, result1 [, search2, result2, ...] [, default])
 | Tugash | `END` majburiy | `)` bilan (END yo'q) |
 | Operatorlar | `=`, `>`, `<`, `IN`, `BETWEEN`, `AND`/`OR` | Faqat `=` |
 | NULL solishtiruvi | `WHERE`dagi kabi (NULL ≠ NULL) | NULL = NULL deb hisoblaydi |
+| Natija turlari | Bir xil bo'lishi shart; moslashtirmaydi (`ORA-00932`) | Birinchi natijaga implicit moslashtiradi |
 
 ### NULL funksiyalari
 | Funksiya | Argument | Qaytaradi |
@@ -235,4 +248,8 @@ DECODE(expression, search1, result1 [, search2, result2, ...] [, default])
 *   **`CASE`** har doim `END` bilan; `THEN`/`ELSE` turlari bir xil; mos yo'q + `ELSE` yo'q → NULL.
 *   **Simple CASE** va **DECODE** faqat `=` bilan; `>`/`<`/`IN` kerak bo'lsa Searched CASE.
 *   **`DECODE`** da `END` yo'q, u `NULL = NULL` ni teng deb biladi, faqat Oracle'da ishlaydi.
+*   **Qaytuvchi tur:** `DECODE` natijalarni birinchi natijaga **moslashtiradi**; `CASE` esa moslashtirmaydi — turlar har xil bo'lsa `ORA-00932`.
+*   **`||`** har doim operandlarni matnga o'tkazadi (`5 || 5` → `'55'`).
+*   **Musbat son** `TO_CHAR` da ishora uchun boshida **bo'sh joy** oladi (`'999'` → `' 150'`); `FM`/`S`/`MI` olib tashlaydi.
+*   **`NVL`/`COALESCE`** natija turi **birinchi argument** bo'yicha; qolganlari moslanmasa xatolik (masalan sanaga matn).
 *   `NULL` ustidagi har qanday arifmetik amal → **`NULL`** (`100 * NULL` → NULL, 0 emas); shuning uchun hisob-kitobda `NVL`/`COALESCE`.
