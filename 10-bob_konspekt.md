@@ -87,6 +87,13 @@ View orqali `INSERT`/`UPDATE`/`DELETE` qilish uchun view **updatable** bo'lishi 
 * **`ALTER VIEW v COMPILE;`** — asos jadval o'zgarib view `INVALID` bo'lsa, qayta kompilyatsiya qiladi.
 * **`DROP VIEW v;`** — view'ni o'chiradi; asos jadvalga ta'sir qilmaydi.
 
+> **⚠️ Asos jadval o'zgarsa:** asos jadval `DROP` qilinsa yoki ishlatilayotgan ustun o'chirilsa, view **avtomatik o'chmaydi** — `INVALID` holatga tushadi va chaqirilganda xato beradi:
+> ```sql
+> DROP TABLE employees;
+> SELECT * FROM emp_view;   -- ORA-04063: view "EMP_VIEW" has errors
+> ```
+> Jadval qayta yaratilsa, view keyingi chaqiruvda avtomatik (yoki `ALTER VIEW ... COMPILE` bilan) qayta kompilyatsiya bo'ladi.
+
 ---
 
 ## 3-Qism: Sequence'lar (10.03)
@@ -142,6 +149,11 @@ Uzilish paydo bo'ladi, agar:
 * **EXAM CRITICAL:** `ALTER SEQUENCE` bilan **`START WITH` ni o'zgartirib BO'LMAYDI** → `ORA-02283: cannot alter starting sequence number`. O'zgartirish uchun `DROP` + qayta `CREATE`.
 * `INCREMENT BY`, `MAXVALUE`, `CACHE` va boshqalarni `ALTER` qilish mumkin.
 
+> **`USER_SEQUENCES.LAST_NUMBER`** — joriy qiymat emas, **diskda saqlangan** keyingi raqam. `CACHE` tufayli u xotiradagi haqiqiy `NEXTVAL`dan **oldinda** turadi (cache'dagi butun blok oldindan ajratiladi):
+> ```sql
+> SELECT sequence_name, last_number, cache_size FROM user_sequences;
+> ```
+
 ### IDENTITY ustunlari (12c+/19c) — sequence'ga muqobil
 
 > Oracle 12c+ da avtomatik raqamlash uchun ustun darajasida **IDENTITY** ishlatiladi (ichida yashirin sequence yaratadi):
@@ -170,6 +182,16 @@ Uzilish paydo bo'ladi, agar:
 | **Unique** | qiymat noyobligini ta'minlaydi |
 | **Composite** | bir nechta ustun; birinchi (leading) ustun eng muhim |
 | **Function-based** | ifoda bo'yicha: `CREATE INDEX i ON t(UPPER(name))` |
+
+### Composite va DESC index (ustun tartibi muhim)
+
+```sql
+CREATE INDEX ix_emp ON employees (department_id, salary DESC);
+```
+
+* **Composite index'da leading (birinchi) ustun hal qiluvchi:** optimizer index'dan faqat so'rovda **leading ustun** (`department_id`) qatnashganda samarali foydalanadi. Faqat `salary` bo'yicha qidiruv bu index'ni to'liq ishlata olmaydi.
+* **`DESC`** — ustunni kamayuvchi tartibda saqlaydi; `ORDER BY ... DESC` so'rovlarini tezlashtiradi. (DESC bo'lmasa, default **ASC**.)
+* **Function-based tuzoq:** `WHERE UPPER(name)='TOM'` so'rovi oddiy `name` index'ini **ishlatmaydi** — aynan `UPPER(name)` ustidagi function-based index kerak.
 
 ### Avtomatik (implicit) index
 
@@ -267,7 +289,54 @@ FLASHBACK TABLE emp TO RESTORE POINT rp_good;
 
 ---
 
-## 6-Qism: Imtihon Tuzoqlari — Tezkor Takrorlash
+## 6-Qism: Synonym'lar (10.06)
+
+**Synonym** — bir ob'ektga (table, view, sequence, synonym, PL/SQL) qo'yilgan **taxallus (alias)**. Uzun yoki boshqa sxemadagi nomni qisqartiradi; o'zida ma'lumot saqlamaydi.
+
+### Sintaksis
+
+```sql
+CREATE [OR REPLACE] [PUBLIC] SYNONYM syn_name FOR [schema.]object;
+
+-- Private synonym (faqat yaratgan sxemaga tegishli):
+CREATE SYNONYM emp FOR hr.employees;
+
+-- Public synonym (butun baza foydalanuvchilariga ko'rinadi):
+CREATE PUBLIC SYNONYM dept FOR hr.departments;
+```
+
+* **Private synonym** — schema ob'ekti; Table/View/Sequence bilan **bitta namespace**ni baham ko'radi (1-Qim), shuning uchun o'sha sxemada bir xil nomli table bilan birga bo'la olmaydi.
+* **Public synonym** — nonschema ob'ekti (baza darajasida); `PUBLIC` sxemasiga tegishli.
+* **`OR REPLACE`** — mavjud synonym'ni qayta yozadi (`CREATE TABLE`da yo'q, lekin synonym/view/sequence'da bor).
+* Synonym yaratish **asos ob'ekt mavjudligini talab qilmaydi** va huquqni tekshirmaydi; chaqirilganda tekshiriladi.
+
+### Nom yechish tartibi (resolution) — EXAM CRITICAL
+
+Nom chaqirilganda Oracle shu tartibda qidiradi:
+
+1. Joriy sxemadagi **o'z ob'ekti** (table/view/...) yoki **private synonym**.
+2. Topilmasa — **public synonym**.
+
+> **⚠️ Tuzoq:** agar sxemada `ORDERS` nomli **o'z jadvali** bo'lsa va **public synonym** ham `ORDERS` bo'lsa → doim **o'z jadvali** ustunlik qiladi, public synonym "ko'milib" qoladi.
+> ```sql
+> CREATE PUBLIC SYNONYM orders FOR hr.orders;   -- hr.orders ga ishora
+> -- Lekin scott sxemasida o'zining ORDERS jadvali bo'lsa:
+> SELECT * FROM orders;   -- scott.orders dan oladi (public synonym emas!)
+> ```
+
+### DROP va INVALID holat
+
+```sql
+DROP SYNONYM emp;                 -- private
+DROP PUBLIC SYNONYM dept;         -- public (PUBLIC so'zi SHART)
+```
+
+* Asos ob'ekt o'chirilsa, synonym **o'chmaydi** — lekin `INVALID` bo'ladi; chaqirilsa → `ORA-00980: synonym translation is no longer valid`.
+* `DROP TABLE` synonym'ni avtomatik o'chirmaydi (view'ga o'xshab, bog'liq synonym qoladi).
+
+---
+
+## 7-Qism: Imtihon Tuzoqlari — Tezkor Takrorlash
 
 * **Namespace:** bir sxemada Table va View bir xil nom **mumkin emas** (`ORA-00955`); Table, Index, Constraint esa bir xil nomli bo'la **oladi**.
 * **`CREATE VIEW`** da `OR REPLACE` va `FORCE` bor; **`CREATE TABLE`** da bu kalit so'zlar **yo'q**.
@@ -285,3 +354,8 @@ FLASHBACK TABLE emp TO RESTORE POINT rp_good;
 * **Flashback Table `TO TIMESTAMP/SCN`** → `ENABLE ROW MOVEMENT` **MAJBURIY** (`ORA-08189`); `TO BEFORE DROP` uchun kerak emas.
 * **Flashback Drop** → Foreign Key **tiklanmaydi**; `PURGE` qilingan → `ORA-38305`.
 * **Flashback Query** (`AS OF`, `VERSIONS BETWEEN`) → faqat ko'rish, jadvalni o'zgartirmaydi.
+* **View INVALID** → asos jadval o'chsa/o'zgarsa view o'chmaydi, `INVALID` bo'ladi (`ORA-04063`); `ALTER VIEW ... COMPILE`.
+* **Composite index** → faqat **leading ustun** so'rovda bo'lsa samarali; `UPPER(col)` so'rovi oddiy index'ni ishlatmaydi (function-based kerak).
+* **`USER_SEQUENCES.LAST_NUMBER`** → joriy qiymat emas, cache tufayli diskdagi keyingi (oldinda turuvchi) raqam.
+* **Synonym resolution** → avval o'z ob'ekt/private synonym, keyin public synonym; o'z jadvali bir xil nomli public synonym'dan **ustun**.
+* **`DROP PUBLIC SYNONYM`** → `PUBLIC` so'zi shart; asos ob'ekt o'chsa synonym `INVALID` (`ORA-00980`).

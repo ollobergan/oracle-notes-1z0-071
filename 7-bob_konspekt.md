@@ -172,7 +172,64 @@ FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY
 
 ---
 
-## 9-Qism: Imtihon Tuzoqlari — Tezkor Takrorlash
+## 9-Qism: ROLLUP, CUBE, GROUPING SETS va GROUPING
+
+Bular `GROUP BY` ni kengaytirib, oddiy guruhlar ustiga **subtotal (oraliq jami)** va **grand total (umumiy jami)** qatorlarini qo'shadi. Faqat `GROUP BY` bilan ishlaydi.
+
+### ROLLUP — ierarxik subtotal
+`GROUP BY ROLLUP(a, b)` → `(a, b)`, `(a)` va `()` bo'yicha jami beradi (chapdan o'ngga, pog'onama-pog'ona). `n` ustun → **`n + 1`** daraja jami.
+
+```sql
+SELECT department_id, job_id, SUM(salary)
+FROM   employees
+GROUP BY ROLLUP(department_id, job_id);
+```
+Natija qatorlari:
+*   har bir `(department_id, job_id)` juftligi uchun jami,
+*   har bir `department_id` bo'yicha subtotal (`job_id` = NULL),
+*   bitta grand total (`department_id` ham, `job_id` ham = NULL).
+
+### CUBE — barcha kombinatsiyalar
+`GROUP BY CUBE(a, b)` → `(a, b)`, `(a)`, `(b)` va `()` — **barcha** mumkin kombinatsiyalar. `n` ustun → **`2ⁿ`** daraja jami.
+
+```sql
+SELECT department_id, job_id, SUM(salary)
+FROM   employees
+GROUP BY CUBE(department_id, job_id);
+```
+`ROLLUP` dan farqi: `CUBE` qo'shimcha ravishda **`(job_id)` bo'yicha ham** subtotal beradi (`department_id` = NULL).
+
+### GROUPING SETS — faqat kerakli guruhlar
+Faqat o'zingiz sanagan guruhlarni hisoblaydi — ortiqcha kombinatsiyalarsiz.
+
+```sql
+SELECT department_id, job_id, SUM(salary)
+FROM   employees
+GROUP BY GROUPING SETS ((department_id, job_id), (department_id), ());
+```
+Yuqoridagi `ROLLUP(department_id, job_id)` bilan aynan bir xil natija beradi, lekin har bir guruhni qo'lda ko'rsatish mumkin.
+
+### GROUPING() funksiyasi
+Qaytargan NULL **haqiqiy ma'lumotmi** yoki **subtotal natijasimi** — shuni ajratadi.
+*   `GROUPING(col)` → oddiy qatorda **`0`**, subtotal qatorida (o'sha ustun yig'ilgan bo'lsa) **`1`**.
+
+```sql
+SELECT
+  DECODE(GROUPING(department_id), 1, 'All Depts', department_id) AS dept,
+  SUM(salary)
+FROM employees
+GROUP BY ROLLUP(department_id);
+```
+Bu yerda grand total qatorida `department_id` NULL o'rniga `'All Depts'` ko'rinadi.
+
+> **⚠️ Tuzoqlar:**
+> *   `ROLLUP(a, b)` ≠ `CUBE(a, b)` — `CUBE` ko'proq qator beradi (`(b)` bo'yicha ham).
+> *   `ROLLUP((a, b), c)` — qavs ichidagi `(a, b)` **bitta birlik** sifatida olinadi (kompozit ustun), daraja soni kamayadi.
+> *   `GROUPING` faqat `ROLLUP`/`CUBE`/`GROUPING SETS` bilan ma'noli; oddiy `GROUP BY` da doim `0` qaytaradi.
+
+---
+
+## 10-Qism: Imtihon Tuzoqlari — Tezkor Takrorlash
 
 *   **`COUNT(*)`** — NULL va takror qatorlarni ham sanaydi; qolgan hamma guruh funksiyasi NULL ni tashlaydi.
 *   Bo'sh/hammasi-NULL guruhda: `COUNT` → **0**, qolganlari → **NULL**.
@@ -184,5 +241,6 @@ FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY
 *   **GROUP BY asosiy qoidasi:** SELECT dagi har element yo agregatda, yo `GROUP BY` da. Teskarisi majburiy emas.
 *   **`GROUP BY` da alias YO'Q**; ifoda (`TO_CHAR(...)`) mumkin; LOB bo'yicha guruhlash yo'q.
 *   **`WHERE` da guruh funksiyasi YO'Q** — guruh filtri faqat `HAVING`.
+*   **`ROLLUP(a,b)`** → `n+1` daraja jami; **`CUBE(a,b)`** → `2ⁿ` daraja (CUBE ko'proq, `(b)` bo'yicha ham). **`GROUPING(col)`** subtotal qatorida `1`, oddiy qatorda `0`.
 *   **`HAVING`** faqat guruhlangan yoki agregatga o'ralgan ustun bilan; `GROUP BY` bilan tartibi ixtiyoriy.
 *   Mantiqiy tartib: **FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY**.

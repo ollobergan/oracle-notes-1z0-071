@@ -30,6 +30,10 @@ Aniq bir mavjud obyekt (jadval, view, sequence, procedure) ustidagi amal huquqi.
 - **Egalik (Ownership):** obyektni yaratgan foydalanuvchi uning barcha object huquqlariga avtomatik ega.
 - **Jadval huquqlari:** `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `ALTER`, `INDEX`, `REFERENCES`, `READ`.
 - **Procedure/function/package huquqi:** `EXECUTE`.
+- **Sequence huquqlari:** faqat **2 ta** object huquqi bor — **`SELECT`** (`NEXTVAL`/`CURRVAL` olish uchun) va **`ALTER`** (`INCREMENT`/`MAXVALUE` kabilarni o'zgartirish). `INSERT`/`UPDATE`/`DELETE` sequence'ga tegishli emas.
+  ```sql
+  GRANT SELECT ON order_seq TO henry;   -- henry endi order_seq.NEXTVAL ishlata oladi
+  ```
 - **`MERGE`** uchun alohida huquq yo'q — nishon bo'yicha `INSERT`/`UPDATE`/`DELETE` va manba bo'yicha `SELECT` huquqlari kerak.
 
 **Sintaksis** (`ON object` majburiy):
@@ -44,6 +48,18 @@ GRANT UPDATE (salary) ON employees TO henry;
 GRANT INSERT (employee_id, last_name) ON employees TO henry;
 ```
 - **`SELECT` va `DELETE` ustun darajasida berib bo'lmaydi** (ular butun qatorga ishlaydi). Ustunlarni `SELECT`dan yashirish uchun **view** ishlatiladi.
+
+> **⚠️ REVOKE ustun darajasida ISHLAMAYDI (EXAM):** huquqni ustun bo'yicha `GRANT` qilsa bo'ladi, lekin ustun bo'yicha **`REVOKE` qilib bo'lmaydi**. `REVOKE` har doim **butun** object huquqini (barcha ustunlar bilan) olib tashlaydi:
+> ```sql
+> GRANT UPDATE (salary, commission_pct) ON employees TO henry;
+>
+> -- Faqat bitta ustunni olib tashlashga urinish → XATO:
+> REVOKE UPDATE (salary) ON employees FROM henry;   -- sintaksis xatosi
+>
+> -- To'g'ri yo'l: butun UPDATE ni revoke qilib, keraklisini qayta grant qilish:
+> REVOKE UPDATE ON employees FROM henry;            -- HAMMA ustun olib tashlanadi
+> GRANT  UPDATE (commission_pct) ON employees TO henry;  -- kerakligini qayta berish
+> ```
 
 ### READ vs SELECT (Oracle 12c+/19c) — imtihon nuqtasi
 - **`SELECT`** — o'qish + qatorlarni qulflash: `SELECT ... FOR UPDATE` va `LOCK TABLE ... IN EXCLUSIVE MODE` ishlaydi.
@@ -176,7 +192,7 @@ DROP USER lisa CASCADE;                 -- foydalanuvchi + uning barcha obyektla
 | Sintaksis | `GRANT priv TO user;` | `GRANT priv ON obj TO user;` |
 | Uzatish opsiyasi | `WITH ADMIN OPTION` | `WITH GRANT OPTION` |
 | REVOKE kaskadliligi | **Kaskadsiz** | **Kaskadli** |
-| Ustun darajasida | — | `INSERT/UPDATE/REFERENCES` (ha); `SELECT/DELETE` (yo'q) |
+| Ustun darajasida | — | GRANT: `INSERT/UPDATE/REFERENCES` (ha), `SELECT/DELETE` (yo'q); REVOKE esa doim **butun huquq** (ustun bo'yicha emas) |
 | `ALL` sintaksisi | `GRANT ALL PRIVILEGES TO user;` | `GRANT ALL ON obj TO user;` |
 
 ### Direct vs Role-based huquq

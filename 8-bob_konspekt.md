@@ -23,6 +23,14 @@ Ikkita sintaksis oilasi mavjud:
 *   **ANSI/ISO SQL** — `JOIN … ON/USING`, `NATURAL JOIN`, `CROSS JOIN`, `LEFT/RIGHT/FULL OUTER JOIN`.
 *   **Oracle eski (proprietary)** — jadvallar `FROM` da vergul bilan, shart `WHERE` da; tashqi birlashma uchun `(+)`.
 
+> **`INNER` kalit so'zi ixtiyoriy:** yolg'iz `JOIN` — bu **INNER JOIN** (faqat mos qatorlar). `INNER JOIN` = `JOIN`; `NATURAL JOIN`, `JOIN…USING`, `JOIN…ON` — barchasi standart holda inner.
+> ```sql
+> SELECT e.last_name, d.department_name
+> FROM   employees e JOIN departments d          -- = INNER JOIN
+>   ON e.department_id = d.department_id;
+> ```
+> Bunga teskari o'laroq, `OUTER` so'zi outer join'larda ixtiyoriy (`LEFT JOIN` = `LEFT OUTER JOIN`), lekin `LEFT`/`RIGHT`/`FULL` so'zining o'zi majburiy.
+
 ---
 
 ## 2-Qism: Dekart Ko'paytmasi va CROSS JOIN
@@ -100,6 +108,13 @@ SELECT employee_id, e.last_name, a.street_address  -- employee_id prefikssiz
 FROM   employees e JOIN addresses a USING (employee_id);
 ```
 
+> **Prefikssizlik SELECT bilan cheklanmaydi:** birlashtiruvchi ustun `WHERE`, `ORDER BY`, `GROUP BY` da ham prefiks/taxallus **olmasligi** kerak — aks holda `ORA-25155`.
+> ```sql
+> ... USING (employee_id) WHERE e.employee_id > 100;  -- XATO (ORA-25155)
+> ... USING (employee_id) WHERE employee_id > 100;    -- TO'G'RI
+> ```
+> **`SELECT *` da tartib:** `USING`/`NATURAL JOIN` da `SELECT *` qilinganda birlashtiruvchi ustun(lar) **eng chapda, bir marta** chiqadi, keyin chap jadvalning qolgan ustunlari, so'ng o'ng jadvalniki. (`JOIN…ON` da esa ustun ikki marta — har ikki jadvaldan — chiqadi.)
+
 ---
 
 ## 6-Qism: JOIN … ON — eng moslashuvchan usul
@@ -154,6 +169,25 @@ LEFT OUTER JOIN departments d ON e.department_id = d.department_id;
 -- Bo'limi yo'q xodim ham chiqadi; uning department_name = NULL
 ```
 
+> **⚠️ ENG KO'P TUSHADIGAN TUZOQ — `ON` da filtr vs `WHERE` da filtr:**
+> Outer join'da optional (NULL qaytishi mumkin) jadval ustuniga qo'yilgan filtr **qayerda** turgani natijani butunlay o'zgartiradi.
+> ```sql
+> -- (A) ON da filtr: outer join SAQLANADI — barcha xodim chiqadi
+> SELECT e.last_name, d.department_name
+> FROM   employees e
+> LEFT JOIN departments d
+>   ON e.department_id = d.department_id
+>   AND d.department_name = 'Sales';
+>
+> -- (B) WHERE da filtr: outer join YO'QOLADI — de-fakto INNER JOIN bo'lib qoladi
+> SELECT e.last_name, d.department_name
+> FROM   employees e
+> LEFT JOIN departments d
+>   ON e.department_id = d.department_id
+> WHERE d.department_name = 'Sales';
+> ```
+> **Sabab:** `WHERE` butun birlashmadan keyin ishlaydi. Mos jufti yo'q xodimlarda `d.department_name` = NULL bo'ladi, `NULL = 'Sales'` esa `UNKNOWN` → o'sha qatorlar filtrdan o'tolmay tashlanadi. Natijada faqat mos qatorlar qoladi (inner join effekti). `ON` dagi shart esa birlashma paytida qo'llaniladi va chap jadval to'liq saqlanadi.
+
 ---
 
 ## 9-Qism: Oracle Eski Sintaksisi — `(+)` Operatori
@@ -173,6 +207,12 @@ Qat'iy cheklovlar (EXAM CRITICAL):
 2.  **FULL OUTER JOIN yaratib bo'lmaydi** — `a.col(+) = b.col(+)` xato.
 3.  Shartda **`OR`** yoki **`IN`** bilan birga ishlatib bo'lmaydi.
 4.  `(+)` qatnashgan shartning ikkinchi tomoni **subquery** bo'lishi mumkin emas.
+5.  Bitta jadvalni bir so'rovda **faqat bitta boshqa jadval** bilan `(+)` orqali tashqi birlashtirish mumkin (bir jadval ikki jadvalga bir vaqtda `(+)` qo'yolmaydi).
+6.  `(+)` qo'yilgan ustun **konstanta** bilan solishtirilsa, u ham `(+)` belgisini olishi kerak, aks holda outer join effekti buziladi:
+    ```sql
+    WHERE s.home_port_id = p.port_id(+)
+      AND p.status(+) = 'ACTIVE';   -- konstantali shartga ham (+) kerak
+    ```
 
 ---
 
@@ -217,7 +257,10 @@ JOIN   ship_cabins c  ON s.ship_id = c.ship_id;
 *   **`NATURAL JOIN`** bilan `ON`/`USING` — xato; umumiy ustunlar turi mos kelmasa — xato.
 *   **`USING`** ustuni doim qavs ichida; qavssiz — xato.
 *   **`NATURAL`/`USING`** da birlashtiruvchi ustun natijada **bir marta**; **`ON`** da ikki marta.
+*   **`JOIN` yolg'iz = INNER JOIN**; `INNER` ixtiyoriy. Outer'da `OUTER` ixtiyoriy, lekin `LEFT`/`RIGHT`/`FULL` majburiy.
+*   **Outer join'da filtr joyi muhim:** optional jadval ustuniga shart `ON` da bo'lsa outer saqlanadi; `WHERE` da bo'lsa inner join'ga aylanadi.
 *   **`OUTER`** so'zi ixtiyoriy; `(+)` **kam/NULL tomonga** qo'yiladi.
-*   **`(+)`**: faqat `WHERE`; `OR`/`IN`/subquery bilan emas; FULL OUTER yasay olmaydi; ANSI `JOIN` bilan aralashmaydi.
+*   **`(+)`**: faqat `WHERE`; `OR`/`IN`/subquery bilan emas; FULL OUTER yasay olmaydi; ANSI `JOIN` bilan aralashmaydi; bir jadvalni faqat bitta jadvalga `(+)` qiladi; konstantali shartga ham `(+)` kerak.
+*   **`NATURAL`/`USING`** birlashtiruvchi ustun `WHERE`/`ORDER BY`/`GROUP BY` da ham prefikssiz; `SELECT *` da u eng chapda bir marta chiqadi.
 *   **Self-join**: jadval ikki xil taxallus bilan; eng yuqori ierarxiya uchun `LEFT OUTER JOIN`.
 *   **n jadval → n−1 shart**; yetmasa dekart ko'paytma.

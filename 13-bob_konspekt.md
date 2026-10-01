@@ -92,7 +92,15 @@ INSERT ALL
   INTO t2 (c1, c2) VALUES (expr3, expr4)
 SELECT ... FROM ...;
 ```
-- `ALL` kalit so'zi va oxiridagi subquery (`SELECT`) **majburiy**. `VALUES`siz, faqat subquery bilan ishlamaydi.
+- `ALL` kalit so'zi va oxiridagi subquery (`SELECT`) **majburiy**.
+- **`VALUES` va ustun ro'yxati — IXTIYORIY (EXAM):** `VALUES` yozilmasa, qiymatlar to'g'ridan-to'g'ri `SELECT` ro'yxatidan (tartib bo'yicha) olinadi:
+  ```sql
+  INSERT ALL
+    INTO t1
+    INTO t2
+  SELECT a, b FROM source;   -- VALUES yo'q → SELECT ustunlari (a, b) ikkala jadvalga ham ketadi
+  ```
+  `VALUES` yozilsa, u subquery ustunlari yoki ifodalaridan (`q1`, `q1*2` kabi) tuziladi.
 
 **Shartli:**
 ```sql
@@ -157,6 +165,7 @@ USING {jadval | view | subquery} s
 ON (t.id = s.id)
 WHEN MATCHED THEN
   UPDATE SET t.col1 = s.col1, t.col2 = s.col2
+  [WHERE update_cond]
   [DELETE WHERE delete_cond]
 WHEN NOT MATCHED THEN
   INSERT (col1, col2)
@@ -164,11 +173,14 @@ WHEN NOT MATCHED THEN
   [WHERE insert_cond];
 ```
 
+- **`UPDATE ... WHERE update_cond` — ixtiyoriy shart (EXAM):** `ON` bo'yicha mos kelgan (`MATCHED`) qatorlarning hammasi emas, faqat shu `WHERE` shartiga tushganlari yangilanadi; qolganlari o'zgarmay qoladi.
+- **`INSERT ... WHERE insert_cond`** — xuddi shunga o'xshab, mos kelmagan (`NOT MATCHED`) qatorlardan faqat shartga tushganlari kiritiladi.
+
 ## 3.3. Qoidalar
 1. **`INTO` — bitta nishon jadval** (yoki updatable view). Majburiy.
 2. **`USING`** — manba (jadval, view yoki inline subquery). Majburiy.
 3. **`ON (shart)`** — moslashtiruvchi shart. Majburiy; qavs ichida yoziladi.
-4. **`WHEN MATCHED` va `WHEN NOT MATCHED` — ikkalasi ham ixtiyoriy**, lekin kamida bittasi bo'lishi kerak (faqat `INSERT` yoki faqat `UPDATE` qilib ham ishlatsa bo'ladi).
+4. **`WHEN MATCHED` va `WHEN NOT MATCHED` — ikkalasi ham ixtiyoriy**, lekin kamida bittasi bo'lishi kerak (faqat `INSERT` yoki faqat `UPDATE` qilib ham ishlatsa bo'ladi). Har qaysi blok **ko'pi bilan bir marta** yoziladi; ikkalasi ham bo'lsa, **tartibi ixtiyoriy** (`WHEN NOT MATCHED` oldin ham kelishi mumkin).
 5. `UPDATE SET`da `UPDATE table` yoki `INSERT`da `INSERT INTO` kalit so'zlari **yozilmaydi**.
 6. **`WHEN NOT MATCHED` → INSERT** faqat **manba (source)** ustunlariga murojaat qila oladi (mos nishon qatori yo'q).
 

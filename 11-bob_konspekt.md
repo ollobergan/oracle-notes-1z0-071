@@ -12,6 +12,15 @@ Konspekt faqat imtihonda tekshiriladigan bilimlarga qaratilgan: qoidalar, istisn
 * `JOIN` jadvallarni **gorizontal** (ustun qo'shib) birlashtiradi; set operator **vertikal** (qator qo'shib).
 * Birlashtirilayotgan so'rovlar o'rtasida PK/FK bog'liqlik **shart emas** — manbalar butunlay bog'liqsiz bo'lishi mumkin.
 * Har bir `SELECT` o'zining `WHERE`, `GROUP BY`, `HAVING`, `JOIN`, funksiya va subquery'siga ega bo'lishi mumkin.
+* **Butun zanjir — bitta natija to'plami:** set-operatorli so'rovni yaxlit holda `FROM` dagi **inline view**, `INSERT ... SELECT`, `CREATE VIEW ... AS` yoki `WITH` ichida ishlatish mumkin.
+  ```sql
+  -- Inline view sifatida (tashqarida yana filtrlash/saralash):
+  SELECT * FROM (
+    SELECT city FROM customers
+    UNION
+    SELECT city FROM vendors
+  ) WHERE city LIKE 'A%';
+  ```
 
 Oracle **19c** da faqat **4 ta** set operatori bor:
 
@@ -24,6 +33,16 @@ Oracle **19c** da faqat **4 ta** set operatori bor:
 
 * **`UNION ALL`** — eng **tez**, chunki duplicate tekshirish/sort yo'q. Takrorlar bo'lmasligini bilsangiz, `UNION` o'rniga ishlating.
 * **`MINUS` kommutativ EMAS:** `A MINUS B ≠ B MINUS A`. Qolgan uchtasida so'rovlar o'rni almashsa natija (to'plam sifatida) o'zgarmaydi.
+
+> **⚠️ Takror olib tashlash ikkala manbaga ta'sir qiladi:** `UNION`, `INTERSECT`, `MINUS` duplicate'ni **har bir manbaning o'zidan ham** olib tashlaydi, nafaqat yakuniy natijadan. Ya'ni natija doim **DISTINCT** bo'ladi.
+> ```sql
+> -- A da 'Towel' IKKI marta bo'lsa, B da umuman bo'lmasa ham:
+> SELECT item FROM a   -- Towel, Towel, Lamp
+> MINUS
+> SELECT item FROM b;  -- Lamp
+> -- Natija: Towel (FAQAT 1 marta), takror yo'qoladi
+> ```
+> Takrorlarni saqlashning yagona yo'li — **`UNION ALL`** (`INTERSECT ALL`/`MINUS ALL` 19c da yo'q).
 
 ---
 
@@ -40,6 +59,13 @@ Oracle **19c** da faqat **4 ta** set operatori bor:
 3. **Ustun nomlari (sarlavhalari) faqat BIRINCHI `SELECT` dan olinadi.** Keyingi so'rovlardagi nom/alias e'tiborga olinmaydi.
 
 4. **Natija ustunining uzunligi/aniqligi** — eng kattasiga tenglashadi (masalan `VARCHAR2(5)` va `VARCHAR2(10)` → natija `VARCHAR2(10)`).
+   * **Tur guruhi ichida tur farq qilsa:** `CHAR` + `VARCHAR2` → natija **`VARCHAR2`**; `NUMBER(4)` + `NUMBER(7,2)` → kattaroq aniqlikni qamrab oladi; `DATE` + `TIMESTAMP` → **`TIMESTAMP`**.
+   ```sql
+   SELECT CAST('AB' AS CHAR(5)) FROM dual        -- CHAR(5)
+   UNION
+   SELECT CAST('XY' AS VARCHAR2(10)) FROM dual;  -- VARCHAR2(10)
+   -- Natija ustuni: VARCHAR2(10) (CHAR emas)
+   ```
 
 5. **`NULL` lar teng deb hisoblanadi.** Takrorlarni aniqlashda (`UNION`, `INTERSECT`, `MINUS`) Oracle `NULL = NULL` deb qaraydi — ikki `NULL` qator bir xil hisoblanadi.
 
@@ -131,3 +157,6 @@ SELECT house FROM kid;
 * **Taqiqlangan:** `BLOB`/`CLOB`/`LONG` ustunlar va `NEXTVAL`/`CURRVAL`.
 * **Prioritet** 19c da teng (chapdan o'ngga); tartibni o'zgartirish → **qavs `()`**.
 * **`NOT IN` + `NULL`** → `no rows`; **`MINUS` + `NULL`** → to'g'ri ishlaydi.
+* **`INTERSECT`/`MINUS`/`UNION`** → natija doim **DISTINCT**; takror har bir manbaning o'zidan ham olib tashlanadi. Takror kerak bo'lsa → faqat `UNION ALL`.
+* **Natija tur guruhi ichida:** `CHAR`+`VARCHAR2` → `VARCHAR2`; `DATE`+`TIMESTAMP` → `TIMESTAMP`; uzunlik/aniqlik → kattarog'i.
+* **Butun set-operatorli so'rov** → inline view, `INSERT ... SELECT`, `CREATE VIEW`, `WITH` ichida yaxlit ishlatiladi.
