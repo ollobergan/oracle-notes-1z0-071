@@ -41,7 +41,7 @@
 ## 4. Nomlash qoidalari (Naming Rules)
 
 **Standard (tirnoqsiz) nom:**
-1. Uzunligi **1–30 belgi**.
+1. Uzunligi **1–30 belgi**. (19c versiyada 1-128 belgi)
 2. Birinchi belgi — **harf** (raqam yoki maxsus belgi emas).
 3. Qolgani: harf, raqam, `$`, `_`, `#`. Boshqa belgi mumkin emas.
 4. **Case-insensitive**, lekin bazada **UPPERCASE** saqlanadi.
